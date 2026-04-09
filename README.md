@@ -83,6 +83,3 @@ The wrapper does not parse job files itself anymore. It simply tells `openclaw` 
 - The official CLI command is `openclaw`. If your shell still says not found, open a new terminal or run `source ~/.zprofile`.
 - The wrapper keeps the session open until you terminate it with `Ctrl+C` or close the terminal.
 - In this environment, OpenClaw is installed but not yet onboarded, so the first `scoutclaw run` will likely start the interactive onboarding flow.
-# scoutclaw git init git add . git commit -m first commit git branch -M main git remote add origin git@github.com:Sarthak160/scoutclaw.git git push -u origin main
-# scoutclaw git init git add . git commit -m first commit git branch -M main git remote add origin git@github.com:Sarthak160/scoutclaw.git git push -u origin main
-# scoutclaw
