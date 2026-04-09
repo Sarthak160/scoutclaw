@@ -1,0 +1,21 @@
+{
+  "name": "scoutclaw",
+  "version": "0.1.0",
+  "description": "CLI to review job postings, draft recruiter outreach, and optionally send emails with your resume attached.",
+  "type": "module",
+  "bin": {
+    "scoutclaw": "./src/cli.js"
+  },
+  "scripts": {
+    "start": "node ./src/cli.js",
+    "lint": "node --check ./src/*.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "commander": "^14.0.1",
+    "dotenv": "^17.2.3",
+    "pdf-parse": "^2.4.5"
+  }
+}
