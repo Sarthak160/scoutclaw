@@ -6,7 +6,7 @@ When you run the project binary, it starts an `openclaw` session and injects a p
 
 ## How it works
 
-- `ScoutClaw` does not implement its own agent loop anymore.
+- `ScoutClaw` does not implement its own agent loop.
 - It launches `openclaw` as a subprocess.
 - It passes your resume path, applicant details, optional jobs file, and SMTP context into the initial prompt.
 - If OpenClaw is not configured yet, it runs `openclaw onboard`.
