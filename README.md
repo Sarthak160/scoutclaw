@@ -10,7 +10,15 @@ ScoutClaw is a Next.js control room for resume-driven OpenClaw outreach runs. It
 - SMTP and applicant profile management from the UI
 - Prompt generation shared between the web app and the CLI wrapper
 
-## Getting Started
+- `ScoutClaw` does not implement its own agent loop.
+- It launches `openclaw` as a subprocess.
+- It passes your resume path, applicant details, optional jobs file, and SMTP context into the initial prompt.
+- If OpenClaw is not configured yet, it runs `openclaw onboard`.
+- If the Gateway is stopped, it starts `openclaw gateway`.
+- It then opens `openclaw tui` with your outreach prompt as the initial message.
+- After that, OpenClaw owns the session and keeps working until you stop it.
+
+## Setup
 
 ```bash
 npm install
@@ -54,6 +62,7 @@ Resume upload is handled by `POST /api/upload`.
 
 ## Notes
 
-- The web UI stores uploaded resumes and persisted settings under [`output/`](/home/sarthak.guest/clawd-bot/output).
-- Start and stop controls manage a background `openclaw agent` process, not the TUI.
-- The original CLI wrapper still exists and can be launched with `npm run cli`.
+- This project is now a client wrapper, not a custom outreach bot.
+- The official CLI command is `openclaw`. If your shell still says not found, open a new terminal or run `source ~/.zprofile`.
+- The wrapper keeps the session open until you terminate it with `Ctrl+C` or close the terminal.
+- In this environment, OpenClaw is installed but not yet onboarded, so the first `scoutclaw run` will likely start the interactive onboarding flow.
