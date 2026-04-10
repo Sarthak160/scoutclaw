@@ -86,6 +86,11 @@ export function spawnTuiSession({
   );
 }
 
+export const __testables = {
+  gatewayLooksHealthy,
+  isGatewayModeMissing
+};
+
 function resolveConfigPath() {
   if (process.env.OPENCLAW_CONFIG_PATH) {
     return process.env.OPENCLAW_CONFIG_PATH;
