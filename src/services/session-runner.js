@@ -6,6 +6,14 @@ import { extractResumeInsights } from "./resume.js";
 import { getSettings } from "./settings-store.js";
 
 const MAX_LOG_CHARS = 16000;
+const sessionRunnerDeps = {
+  spawn,
+  ensureOpenClawReady,
+  splitCommand,
+  buildPrompt,
+  extractResumeInsights,
+  getSettings
+};
 
 function getRuntimeState() {
   if (!globalThis.__scoutclawRuntimeState) {
@@ -36,15 +44,15 @@ export async function startSessionRun() {
     throw new Error("A ScoutClaw run is already active.");
   }
 
-  const settings = await getSettings();
+  const settings = await sessionRunnerDeps.getSettings();
   const resumePath = settings.resumePath ? path.resolve(settings.resumePath) : "";
   const jobsFile = settings.jobsFile ? path.resolve(settings.jobsFile) : "";
   const workspace = path.resolve(settings.workspace || process.cwd());
   const profileArgs = settings.profile ? ["--profile", settings.profile] : [];
-  const parsedCommand = splitCommand(settings.openClawCmd);
-  const resumeInsights = await extractResumeInsights(resumePath);
+  const parsedCommand = sessionRunnerDeps.splitCommand(settings.openClawCmd);
+  const resumeInsights = await sessionRunnerDeps.extractResumeInsights(resumePath);
 
-  const prompt = buildPrompt({
+  const prompt = sessionRunnerDeps.buildPrompt({
     resumePath,
     jobsFile,
     resumeInsights,
@@ -67,14 +75,14 @@ export async function startSessionRun() {
     resumeSignals: resumeInsights.searchSignals
   };
 
-  await ensureOpenClawReady({
+  await sessionRunnerDeps.ensureOpenClawReady({
     command: parsedCommand.command,
     commandArgs: parsedCommand.args,
     profileArgs,
     workspace
   });
 
-  const child = spawn(
+  const child = sessionRunnerDeps.spawn(
     parsedCommand.command,
     [
       ...parsedCommand.args,
@@ -145,7 +153,16 @@ export function getSessionState() {
   };
 }
 
-function extractJsonResponse(logs) {
+export function __resetSessionRunnerState() {
+  delete globalThis.__scoutclawRuntimeState;
+  resetSessionRunnerDeps();
+}
+
+export function __setSessionRunnerDeps(overrides) {
+  Object.assign(sessionRunnerDeps, overrides);
+}
+
+export function __testablesExtractJsonResponse(logs) {
   const lines = logs
     .split("\n")
     .map((line) => line.trim())
@@ -166,4 +183,17 @@ function extractJsonResponse(logs) {
   }
 
   return "";
+}
+
+function resetSessionRunnerDeps() {
+  sessionRunnerDeps.spawn = spawn;
+  sessionRunnerDeps.ensureOpenClawReady = ensureOpenClawReady;
+  sessionRunnerDeps.splitCommand = splitCommand;
+  sessionRunnerDeps.buildPrompt = buildPrompt;
+  sessionRunnerDeps.extractResumeInsights = extractResumeInsights;
+  sessionRunnerDeps.getSettings = getSettings;
+}
+
+function extractJsonResponse(logs) {
+  return __testablesExtractJsonResponse(logs);
 }

@@ -1,15 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const OUTPUT_ROOT = path.join(process.cwd(), "output");
-const SETTINGS_PATH = path.join(OUTPUT_ROOT, "scoutclaw-settings.json");
-const UPLOAD_DIR = path.join(OUTPUT_ROOT, "uploads");
-
 export async function getSettings() {
   await ensureOutputLayout();
+  const { settingsPath } = getStorePaths();
 
   try {
-    const raw = await fs.readFile(SETTINGS_PATH, "utf8");
+    const raw = await fs.readFile(settingsPath, "utf8");
     return mergeSettings(JSON.parse(raw));
   } catch {
     const defaults = defaultSettings();
@@ -20,8 +17,9 @@ export async function getSettings() {
 
 export async function saveSettings(nextSettings) {
   await ensureOutputLayout();
+  const { settingsPath } = getStorePaths();
   const merged = mergeSettings(nextSettings);
-  await fs.writeFile(SETTINGS_PATH, JSON.stringify(merged, null, 2), "utf8");
+  await fs.writeFile(settingsPath, JSON.stringify(merged, null, 2), "utf8");
   return merged;
 }
 
@@ -52,12 +50,13 @@ export function defaultSettings() {
 }
 
 export function getUploadDirectory() {
-  return UPLOAD_DIR;
+  return getStorePaths().uploadDir;
 }
 
 async function ensureOutputLayout() {
-  await fs.mkdir(OUTPUT_ROOT, { recursive: true });
-  await fs.mkdir(UPLOAD_DIR, { recursive: true });
+  const { outputRoot, uploadDir } = getStorePaths();
+  await fs.mkdir(outputRoot, { recursive: true });
+  await fs.mkdir(uploadDir, { recursive: true });
 }
 
 function mergeSettings(input) {
@@ -76,4 +75,16 @@ function mergeSettings(input) {
 
 function normalizeArray(value, fallback) {
   return Array.isArray(value) ? value.filter(Boolean) : fallback;
+}
+
+function getStorePaths() {
+  const outputRoot = process.env.SCOUTCLAW_OUTPUT_DIR
+    ? path.resolve(process.env.SCOUTCLAW_OUTPUT_DIR)
+    : path.join(process.cwd(), "output");
+
+  return {
+    outputRoot,
+    settingsPath: path.join(outputRoot, "scoutclaw-settings.json"),
+    uploadDir: path.join(outputRoot, "uploads")
+  };
 }

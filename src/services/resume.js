@@ -25,6 +25,11 @@ export async function extractResumeInsights(resumePath) {
   }
 }
 
+export const __testables = {
+  deriveSearchSignals,
+  normalizeWhitespace
+};
+
 function emptyResumeInsights() {
   return {
     excerpt: "",

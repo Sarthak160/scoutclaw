@@ -6,6 +6,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request) {
+  return createUploadResponse(request);
+}
+
+export async function createUploadResponse(
+  request,
+  { writeFile = fs.writeFile, now = Date.now, getUploadDir = getUploadDirectory, readSettings = getSettings, persistSettings = saveSettings } = {}
+) {
   const formData = await request.formData();
   const file = formData.get("resume");
 
@@ -13,15 +20,15 @@ export async function POST(request) {
     return Response.json({ error: "Missing resume file." }, { status: 400 });
   }
 
-  const uploadDir = getUploadDirectory();
+  const uploadDir = getUploadDir();
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-  const targetPath = path.join(uploadDir, `${Date.now()}-${safeName}`);
+  const targetPath = path.join(uploadDir, `${now()}-${safeName}`);
   const bytes = Buffer.from(await file.arrayBuffer());
 
-  await fs.writeFile(targetPath, bytes);
+  await writeFile(targetPath, bytes);
 
-  const settings = await getSettings();
-  await saveSettings({
+  const settings = await readSettings();
+  await persistSettings({
     ...settings,
     resumePath: targetPath
   });

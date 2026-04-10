@@ -15,6 +15,10 @@ const PLAN_CONFIG = {
 };
 
 export async function POST(request) {
+  return createCheckoutResponse(request);
+}
+
+export async function createCheckoutResponse(request, { stripeFactory = (key) => new Stripe(key) } = {}) {
   const { plan } = await request.json();
   const config = PLAN_CONFIG[plan];
 
@@ -26,7 +30,7 @@ export async function POST(request) {
     return Response.json({ error: "Stripe is not configured yet. Add STRIPE_SECRET_KEY first." }, { status: 500 });
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const stripe = stripeFactory(process.env.STRIPE_SECRET_KEY);
   const origin = request.headers.get("origin") || process.env.APP_URL || "http://localhost:3000";
 
   const session = await stripe.checkout.sessions.create({
@@ -51,3 +55,7 @@ export async function POST(request) {
     url: session.url
   });
 }
+
+export const __testables = {
+  PLAN_CONFIG
+};

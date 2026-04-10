@@ -94,49 +94,28 @@ const schema = buildSchema(`
   }
 `);
 
-const rootValue = {
-  dashboardState: getDashboardState,
-  updateSettings: async ({ input }) => {
-    const current = await getSettings();
-    await saveSettings({
-      ...current,
-      ...pickDefined(input),
-      applicant: {
-        ...current.applicant,
-        ...pickDefined(input.applicant || {})
-      }
-    });
-    return getDashboardState();
-  },
-  addFilter: async ({ value }) => {
-    const current = await getSettings();
-    const nextValue = value.trim();
-    if (!nextValue) {
-      return getDashboardState();
-    }
-
-    const filters = Array.from(new Set([...current.filters, nextValue]));
-    await saveSettings({ ...current, filters });
-    return getDashboardState();
-  },
-  removeFilter: async ({ value }) => {
-    const current = await getSettings();
-    await saveSettings({
-      ...current,
-      filters: current.filters.filter((entry) => entry !== value)
-    });
-    return getDashboardState();
-  },
-  startRun: async () => startSessionRun(),
-  stopRun: async () => stopSessionRun()
+const defaultDeps = {
+  getSessionState,
+  startSessionRun,
+  stopSessionRun,
+  getSettings,
+  saveSettings,
+  extractResumeInsights
 };
+
+const rootValue = createRootValue(defaultDeps);
 
 export async function POST(request) {
   const body = await request.json();
+  return createGraphQLResponse(body);
+}
+
+export async function createGraphQLResponse(body, deps = defaultDeps) {
+  const activeRoot = createRootValue(deps);
   const result = await graphql({
     schema,
     source: body.query,
-    rootValue,
+    rootValue: activeRoot,
     variableValues: body.variables
   });
 
@@ -145,16 +124,55 @@ export async function POST(request) {
   });
 }
 
-async function getDashboardState() {
-  const settings = await getSettings();
-  const resumeInsights = await extractResumeInsights(settings.resumePath);
+export function createRootValue(deps) {
+  return {
+  dashboardState: () => getDashboardState(deps),
+  updateSettings: async ({ input }) => {
+    const current = await deps.getSettings();
+    await deps.saveSettings({
+      ...current,
+      ...pickDefined(input),
+      applicant: {
+        ...current.applicant,
+        ...pickDefined(input.applicant || {})
+      }
+    });
+    return getDashboardState(deps);
+  },
+  addFilter: async ({ value }) => {
+    const current = await deps.getSettings();
+    const nextValue = value.trim();
+    if (!nextValue) {
+      return getDashboardState(deps);
+    }
+
+    const filters = Array.from(new Set([...current.filters, nextValue]));
+    await deps.saveSettings({ ...current, filters });
+    return getDashboardState(deps);
+  },
+  removeFilter: async ({ value }) => {
+    const current = await deps.getSettings();
+    await deps.saveSettings({
+      ...current,
+      filters: current.filters.filter((entry) => entry !== value)
+    });
+    return getDashboardState(deps);
+  },
+  startRun: async () => deps.startSessionRun(),
+  stopRun: async () => deps.stopSessionRun()
+};
+}
+
+async function getDashboardState(deps) {
+  const settings = await deps.getSettings();
+  const resumeInsights = await deps.extractResumeInsights(settings.resumePath);
   return {
     settings,
-    run: getSessionState(),
+    run: deps.getSessionState(),
     resumeInsights
   };
 }
 
-function pickDefined(value) {
+export function pickDefined(value) {
   return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined));
 }
