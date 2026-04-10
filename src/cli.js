@@ -4,9 +4,9 @@ import { Command } from "commander";
 import dotenv from "dotenv";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { PDFParse } from "pdf-parse";
 import { ensureOpenClawReady, spawnTuiSession, splitCommand } from "./openclaw.js";
 import { buildPrompt } from "./prompt.js";
+import { extractResumeInsights } from "./services/resume.js";
 
 dotenv.config({ quiet: true });
 
@@ -122,67 +122,4 @@ async function runOpenClawSession(options) {
     console.error(error.message);
     process.exit(1);
   });
-}
-
-async function extractResumeInsights(resumePath) {
-  try {
-    const data = await fs.readFile(resumePath);
-    const parser = new PDFParse({ data });
-    const result = await parser.getText();
-    await parser.destroy();
-
-    const normalizedText = normalizeWhitespace(result.text);
-    return {
-      excerpt: normalizedText.slice(0, 4000),
-      searchSignals: deriveSearchSignals(normalizedText)
-    };
-  } catch {
-    return {
-      excerpt: "",
-      searchSignals: []
-    };
-  }
-}
-
-function normalizeWhitespace(text) {
-  return String(text).replace(/\s+/g, " ").trim();
-}
-
-function deriveSearchSignals(text) {
-  const signals = [];
-  const lowerText = text.toLowerCase();
-  const rules = [
-    [/golang| go /i, "golang"],
-    [/\bjava\b/i, "java"],
-    [/\bpython\b/i, "python"],
-    [/\bjavascript\b|\bnode\.?js\b/i, "nodejs"],
-    [/\btypescript\b/i, "typescript"],
-    [/\breact\b/i, "react"],
-    [/\bnext\.?js\b/i, "nextjs"],
-    [/\baws\b|amazon web services/i, "aws"],
-    [/\bgcp\b|google cloud/i, "gcp"],
-    [/\bazure\b/i, "azure"],
-    [/\bdocker\b/i, "docker"],
-    [/\bkubernetes\b|\bk8s\b/i, "kubernetes"],
-    [/\bpostgres(?:ql)?\b/i, "postgresql"],
-    [/\bmysql\b/i, "mysql"],
-    [/\bmongodb\b/i, "mongodb"],
-    [/\bredis\b/i, "redis"],
-    [/\bgraphql\b/i, "graphql"],
-    [/\bgrpc\b/i, "grpc"],
-    [/\bmicroservices?\b/i, "microservices"],
-    [/\bdistributed systems?\b/i, "distributed systems"],
-    [/\bbackend\b/i, "backend"],
-    [/\bfull[\s-]?stack\b/i, "full stack"],
-    [/\bsde[\s-]?2\b|\bsoftware engineer ii\b/i, "sde2"],
-    [/\bsenior software engineer\b/i, "senior software engineer"]
-  ];
-
-  for (const [pattern, label] of rules) {
-    if (pattern.test(lowerText)) {
-      signals.push(label);
-    }
-  }
-
-  return signals.slice(0, 12);
 }

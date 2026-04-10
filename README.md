@@ -1,88 +1,59 @@
 # ScoutClaw
 
-`ScoutClaw` is a thin wrapper around your installed `openclaw`.
+ScoutClaw is a Next.js control room for resume-driven OpenClaw outreach runs. It lets you upload a resume, manage applicant and SMTP details, add custom targeting filters, and start or stop background outreach runs from the browser.
 
-When you run the project binary, it starts an `openclaw` session and injects a persistent system prompt for your job outreach workflow. The wrapper stays attached to the terminal and the session continues working until you close the CLI.
+## What It Includes
 
-## How it works
+- Resume upload with local PDF parsing for search signals
+- GraphQL API for dashboard state, settings, filters, and run controls
+- Background OpenClaw runner using `openclaw agent`
+- SMTP and applicant profile management from the UI
+- Prompt generation shared between the web app and the CLI wrapper
 
-- `ScoutClaw` does not implement its own agent loop anymore.
-- It launches `openclaw` as a subprocess.
-- It passes your resume path, applicant details, optional jobs file, and SMTP context into the initial prompt.
-- If OpenClaw is not configured yet, it runs `openclaw onboard`.
-- If the Gateway is stopped, it starts `openclaw gateway`.
-- It then opens `openclaw tui` with your outreach prompt as the initial message.
-- After that, OpenClaw owns the session and keeps working until you stop it.
-
-## Setup
+## Getting Started
 
 ```bash
 npm install
-npm link
-cp .env.example .env
+npm run dev
 ```
 
-Fill in `.env` with:
+Open `http://localhost:3000`.
 
-- `OPEN_CLAW_CMD` if your executable is not literally `openclaw`
-- your resume path
-- your applicant details
-- optional Gateway token or password if your Gateway requires auth
-- optional SMTP details if your `openclaw` workflow can send mail
+## Environment
 
-## Usage
-
-Start the wrapper:
+Create a local `.env` file if you want defaults for applicant or SMTP settings:
 
 ```bash
-scoutclaw run --resume ./resume.pdf
+OPEN_CLAW_CMD=openclaw
+APPLICANT_NAME=
+APPLICANT_EMAIL=
+APPLICANT_PHONE=
+APPLICANT_LINKEDIN=
+APPLICANT_PORTFOLIO=
+MAIL_FROM=
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
 ```
 
-Run with a jobs file:
+## GraphQL
 
-```bash
-scoutclaw run --jobs-file ./jobs.json --resume ./resume.pdf
-```
+ScoutClaw exposes a local GraphQL endpoint at `/api/graphql`.
 
-If `open-claw` is installed under a different command or path:
+Core operations:
 
-```bash
-scoutclaw run --open-claw-cmd /absolute/path/to/openclaw
-```
+- `dashboardState`
+- `updateSettings`
+- `addFilter`
+- `removeFilter`
+- `startRun`
+- `stopRun`
 
-If you need to pass additional arguments through to `openclaw`:
-
-```bash
-scoutclaw run --open-claw-arg --model --open-claw-arg some-model
-```
-
-Use a named OpenClaw profile:
-
-```bash
-scoutclaw run --profile work --resume ./resume.pdf
-```
-
-You can also append extra system instructions:
-
-```bash
-scoutclaw run --system-file ./campaign-instructions.txt
-```
-
-## Jobs file formats
-
-The wrapper does not parse job files itself anymore. It simply tells `openclaw` where the file is. You can use:
-
-- `jobs.txt`
-- `jobs.json`
-- `jobs.csv`
-- any other format your `open-claw` workflow knows how to read
+Resume upload is handled by `POST /api/upload`.
 
 ## Notes
 
-- This project is now a client wrapper, not a custom outreach bot.
-- The official CLI command is `openclaw`. If your shell still says not found, open a new terminal or run `source ~/.zprofile`.
-- The wrapper keeps the session open until you terminate it with `Ctrl+C` or close the terminal.
-- In this environment, OpenClaw is installed but not yet onboarded, so the first `scoutclaw run` will likely start the interactive onboarding flow.
-# scoutclaw git init git add . git commit -m first commit git branch -M main git remote add origin git@github.com:Sarthak160/scoutclaw.git git push -u origin main
-# scoutclaw git init git add . git commit -m first commit git branch -M main git remote add origin git@github.com:Sarthak160/scoutclaw.git git push -u origin main
-# scoutclaw
+- The web UI stores uploaded resumes and persisted settings under [`output/`](/home/sarthak.guest/clawd-bot/output).
+- Start and stop controls manage a background `openclaw agent` process, not the TUI.
+- The original CLI wrapper still exists and can be launched with `npm run cli`.

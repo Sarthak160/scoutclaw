@@ -1,4 +1,4 @@
-export function buildPrompt({ resumePath, jobsFile, resumeInsights, applicant, extraPrompt }) {
+export function buildPrompt({ resumePath, jobsFile, resumeInsights, applicant, customFilters = [], extraPrompt }) {
   const base = [
     "You are running inside an open-claw session launched by ScoutClaw.",
     "Your job is to continuously help with job outreach until the operator closes this CLI session.",
@@ -37,8 +37,18 @@ export function buildPrompt({ resumePath, jobsFile, resumeInsights, applicant, e
     `Resume excerpt: ${resumeInsights.excerpt || "not available"}`
   ];
 
+  if (customFilters.length > 0) {
+    base.push(`Custom filters: ${customFilters.join(", ")}`);
+  }
+
   if (extraPrompt.trim()) {
-    base.push("", "Additional operator instructions:", extraPrompt.trim());
+    base.push(
+      "",
+      "Advanced prompt guidance:",
+      extraPrompt.trim(),
+      "Use this advanced prompt as a ranking and exclusion layer while searching and evaluating companies.",
+      "When the prompt asks for quality signals such as healthy culture, good reviews, remote friendliness, or strong engineering standards, try to verify those signals from accessible public sources before recommending outreach."
+    );
   }
 
   return base.join("\n");
