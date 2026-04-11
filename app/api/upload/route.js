@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { getUploadDirectory, getSettings, saveSettings } from "../../../src/services/settings-store.js";
+import { recordUploadedAsset } from "../../../src/services/workspace-store.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +12,14 @@ export async function POST(request) {
 
 export async function createUploadResponse(
   request,
-  { writeFile = fs.writeFile, now = Date.now, getUploadDir = getUploadDirectory, readSettings = getSettings, persistSettings = saveSettings } = {}
+  {
+    writeFile = fs.writeFile,
+    now = Date.now,
+    getUploadDir = getUploadDirectory,
+    readSettings = getSettings,
+    persistSettings = saveSettings,
+    recordAsset = recordUploadedAsset
+  } = {}
 ) {
   const formData = await request.formData();
   const file = formData.get("resume");
@@ -31,6 +39,13 @@ export async function createUploadResponse(
   await persistSettings({
     ...settings,
     resumePath: targetPath
+  });
+  await recordAsset({
+    path: targetPath,
+    filename: safeName,
+    mimeType: file.type || "",
+    sizeBytes: bytes.length,
+    kind: settings.mode === "hire" ? "ROLE_BRIEF" : "RESUME"
   });
 
   return Response.json({

@@ -1,15 +1,42 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { getPrismaClient } from "./prisma.js";
+import { defaultSettings, mergeSettings } from "./settings-defaults.js";
+import { getDefaultWorkspaceRecord } from "./workspace-store.js";
 
-const APP_STATE_ID = "default";
+export { defaultSettings, mergeSettings } from "./settings-defaults.js";
 
 export async function getSettings() {
   const prisma = getPrismaClient();
   if (prisma) {
-    return getSettingsFromDatabase(prisma);
+    try {
+      return await getSettingsFromDatabase();
+    } catch {
+      return getSettingsFromFile();
+    }
   }
 
+  return getSettingsFromFile();
+}
+
+export async function saveSettings(nextSettings) {
+  const prisma = getPrismaClient();
+  if (prisma) {
+    try {
+      return await saveSettingsToDatabase(prisma, nextSettings);
+    } catch {
+      return saveSettingsToFile(nextSettings);
+    }
+  }
+
+  return saveSettingsToFile(nextSettings);
+}
+
+export function getUploadDirectory() {
+  return getStorePaths().uploadDir;
+}
+
+async function getSettingsFromFile() {
   await ensureOutputLayout();
   const { settingsPath } = getStorePaths();
 
@@ -23,12 +50,7 @@ export async function getSettings() {
   }
 }
 
-export async function saveSettings(nextSettings) {
-  const prisma = getPrismaClient();
-  if (prisma) {
-    return saveSettingsToDatabase(prisma, nextSettings);
-  }
-
+async function saveSettingsToFile(nextSettings) {
   await ensureOutputLayout();
   const { settingsPath } = getStorePaths();
   const merged = mergeSettings(nextSettings);
@@ -36,58 +58,10 @@ export async function saveSettings(nextSettings) {
   return merged;
 }
 
-export function defaultSettings() {
-  return {
-    resumePath: "",
-    jobsFile: "",
-    workspace: process.cwd(),
-    openClawCmd: process.env.OPEN_CLAW_CMD || "openclaw",
-    openClawArgs: ["--model", "openai-codex/gpt-5.4"],
-    session: "scoutclaw-web",
-    profile: "",
-    extraPrompt: "",
-    applicant: {
-      name: process.env.APPLICANT_NAME || "",
-      email: process.env.APPLICANT_EMAIL || "",
-      phone: process.env.APPLICANT_PHONE || "",
-      linkedin: process.env.APPLICANT_LINKEDIN || "",
-      portfolio: process.env.APPLICANT_PORTFOLIO || "",
-      mailFrom: process.env.MAIL_FROM || "",
-      smtpHost: process.env.SMTP_HOST || "",
-      smtpPort: process.env.SMTP_PORT || "587",
-      smtpUser: process.env.SMTP_USER || "",
-      smtpPass: process.env.SMTP_PASS || ""
-    },
-    filters: []
-  };
-}
-
-export function getUploadDirectory() {
-  return getStorePaths().uploadDir;
-}
-
 async function ensureOutputLayout() {
   const { outputRoot, uploadDir } = getStorePaths();
   await fs.mkdir(outputRoot, { recursive: true });
   await fs.mkdir(uploadDir, { recursive: true });
-}
-
-function mergeSettings(input) {
-  const defaults = defaultSettings();
-  return {
-    ...defaults,
-    ...input,
-    openClawArgs: normalizeArray(input?.openClawArgs, defaults.openClawArgs),
-    filters: normalizeArray(input?.filters, defaults.filters),
-    applicant: {
-      ...defaults.applicant,
-      ...(input?.applicant || {})
-    }
-  };
-}
-
-function normalizeArray(value, fallback) {
-  return Array.isArray(value) ? value.filter(Boolean) : fallback;
 }
 
 function getStorePaths() {
@@ -102,31 +76,29 @@ function getStorePaths() {
   };
 }
 
-async function getSettingsFromDatabase(prisma) {
-  const existing = await prisma.appState.findUnique({
-    where: { id: APP_STATE_ID }
-  });
+async function getSettingsFromDatabase() {
+  const record = await getDefaultWorkspaceRecord();
 
-  if (!existing) {
-    const defaults = defaultSettings();
-    await saveSettingsToDatabase(prisma, defaults);
-    return defaults;
+  if (!record) {
+    return getSettingsFromFile();
   }
 
-  return mergeSettings(existing.settings);
+  return mergeSettings(record.workspace.settings);
 }
 
 async function saveSettingsToDatabase(prisma, nextSettings) {
   await ensureOutputLayout();
   const merged = mergeSettings(nextSettings);
+  const record = await getDefaultWorkspaceRecord();
 
-  await prisma.appState.upsert({
-    where: { id: APP_STATE_ID },
-    create: {
-      id: APP_STATE_ID,
-      settings: merged
-    },
-    update: {
+  if (!record) {
+    return saveSettingsToFile(merged);
+  }
+
+  await prisma.workspace.update({
+    where: { id: record.workspace.id },
+    data: {
+      mode: merged.mode === "hire" ? "HIRE" : merged.mode === "get_hired" ? "GET_HIRED" : null,
       settings: merged
     }
   });

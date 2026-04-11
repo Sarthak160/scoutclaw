@@ -10,8 +10,11 @@ function getRedisClient() {
   if (!globalThis.__scoutclawRedis) {
     globalThis.__scoutclawRedis = new Redis(process.env.REDIS_URL, {
       lazyConnect: true,
-      maxRetriesPerRequest: 1
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+      retryStrategy: () => null
     });
+    globalThis.__scoutclawRedis.on("error", () => {});
   }
 
   return globalThis.__scoutclawRedis;

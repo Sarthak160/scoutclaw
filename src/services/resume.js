@@ -37,11 +37,11 @@ function emptyResumeInsights() {
   };
 }
 
-function normalizeWhitespace(text) {
+export function normalizeWhitespace(text) {
   return String(text).replace(/\s+/g, " ").trim();
 }
 
-function deriveSearchSignals(text) {
+export function deriveSearchSignals(text) {
   const signals = [];
   const lowerText = text.toLowerCase();
   const rules = [

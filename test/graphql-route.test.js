@@ -5,8 +5,10 @@ import { createGraphQLResponse, pickDefined } from "../app/api/graphql/route.js"
 
 function createDeps() {
   let settings = {
+    mode: "get_hired",
     resumePath: "",
     jobsFile: "",
+    jobOpeningUrl: "",
     workspace: "/tmp",
     openClawCmd: "openclaw",
     session: "scoutclaw-web",
@@ -36,7 +38,8 @@ function createDeps() {
       settings = next;
       return next;
     },
-    extractResumeInsights: async () => ({ excerpt: "Resume text", searchSignals: ["golang"] })
+    extractResumeInsights: async () => ({ excerpt: "Resume text", searchSignals: ["golang"] }),
+    extractJobUrlInsights: async () => ({ excerpt: "Job URL text", searchSignals: ["kubernetes"] })
   };
 }
 
@@ -84,4 +87,25 @@ test("graphql updateSettings mutation merges applicant fields", async () => {
   const payload = await response.json();
   assert.equal(payload.data.updateSettings.settings.extraPrompt, "Prefer Bangalore");
   assert.equal(payload.data.updateSettings.settings.applicant.email, "test@example.com");
+});
+
+test("graphql uses job URL metadata in hiring mode", async () => {
+  const response = await createGraphQLResponse(
+    {
+      query: `
+        mutation UpdateSettings($input: SettingsInput!) {
+          updateSettings(input: $input) {
+            resumeInsights { excerpt searchSignals }
+          }
+        }
+      `,
+      variables: { input: { mode: "hire", jobOpeningUrl: "https://example.com/jobs/backend" } }
+    },
+    createDeps()
+  );
+
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.updateSettings.resumeInsights.excerpt, "Job URL text");
+  assert.deepEqual(payload.data.updateSettings.resumeInsights.searchSignals, ["kubernetes"]);
 });
