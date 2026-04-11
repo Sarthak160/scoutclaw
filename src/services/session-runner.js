@@ -2,9 +2,11 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { ensureOpenClawReady, splitCommand } from "../openclaw.js";
 import { buildPrompt } from "../prompt.js";
+import { extractJobUrlInsights } from "./job-url-insights.js";
 import { extractResumeInsights } from "./resume.js";
 import { getSettings } from "./settings-store.js";
 import { cacheSessionState, getCachedSessionState } from "./redis.js";
+import { createCampaignSnapshot, recordRunLog, updateCampaignStatus } from "./workspace-store.js";
 
 const MAX_LOG_CHARS = 16000;
 const sessionRunnerDeps = {
@@ -12,10 +14,14 @@ const sessionRunnerDeps = {
   ensureOpenClawReady,
   splitCommand,
   buildPrompt,
+  extractJobUrlInsights,
   extractResumeInsights,
   getSettings,
   cacheSessionState,
-  getCachedSessionState
+  getCachedSessionState,
+  createCampaignSnapshot,
+  recordRunLog,
+  updateCampaignStatus
 };
 
 function getRuntimeState() {
@@ -34,7 +40,8 @@ function getRuntimeState() {
         promptPreview: "",
         response: "",
         resumeSignals: [],
-        sessionKey: null
+        sessionKey: null,
+        campaignId: null
       }
     };
   }
@@ -54,11 +61,17 @@ export async function startSessionRun() {
   const workspace = path.resolve(settings.workspace || process.cwd());
   const profileArgs = settings.profile ? ["--profile", settings.profile] : [];
   const parsedCommand = sessionRunnerDeps.splitCommand(settings.openClawCmd);
-  const resumeInsights = await sessionRunnerDeps.extractResumeInsights(resumePath);
+  const resumeInsights =
+    settings.mode === "hire" && settings.jobOpeningUrl
+      ? await sessionRunnerDeps.extractJobUrlInsights(settings.jobOpeningUrl)
+      : await sessionRunnerDeps.extractResumeInsights(resumePath);
+  const campaign = await sessionRunnerDeps.createCampaignSnapshot(settings);
 
   const prompt = sessionRunnerDeps.buildPrompt({
+    mode: settings.mode,
     resumePath,
     jobsFile,
+    jobOpeningUrl: settings.jobOpeningUrl || "",
     resumeInsights,
     applicant: settings.applicant,
     customFilters: settings.filters,
@@ -77,9 +90,10 @@ export async function startSessionRun() {
     promptPreview: prompt.slice(0, 4000),
     response: "",
     resumeSignals: resumeInsights.searchSignals,
-    sessionKey: settings.session
+    sessionKey: settings.session,
+    campaignId: campaign?.id || null
   };
-  await persistRuntimeState();
+  await persistRuntimeState({ logToDatabase: true });
 
   await sessionRunnerDeps.ensureOpenClawReady({
     command: parsedCommand.command,
@@ -110,7 +124,7 @@ export async function startSessionRun() {
 
   runtime.process = child;
   runtime.state.pid = child.pid ?? null;
-  await persistRuntimeState();
+  await persistRuntimeState({ logToDatabase: true });
 
   child.stdout.on("data", (chunk) => {
     const next = `${runtime.state.logs}${chunk.toString()}`;
@@ -130,7 +144,7 @@ export async function startSessionRun() {
     runtime.state.error = error.message;
     runtime.state.finishedAt = new Date().toISOString();
     runtime.process = null;
-    void persistRuntimeState();
+    void persistRuntimeState({ logToDatabase: true, updateCampaign: true });
   });
 
   child.on("exit", (code, signal) => {
@@ -139,7 +153,7 @@ export async function startSessionRun() {
     runtime.state.finishedAt = new Date().toISOString();
     runtime.state.status = runtime.state.status === "stopped" ? "stopped" : code === 0 ? "completed" : "failed";
     runtime.process = null;
-    void persistRuntimeState();
+    void persistRuntimeState({ logToDatabase: true, updateCampaign: true });
   });
 
   return getSessionState();
@@ -154,7 +168,7 @@ export function stopSessionRun() {
   runtime.state.status = "stopped";
   runtime.state.finishedAt = new Date().toISOString();
   runtime.process.kill("SIGTERM");
-  void persistRuntimeState();
+  void persistRuntimeState({ logToDatabase: true, updateCampaign: true });
   return getSessionState();
 }
 
@@ -212,21 +226,68 @@ function resetSessionRunnerDeps() {
   sessionRunnerDeps.ensureOpenClawReady = ensureOpenClawReady;
   sessionRunnerDeps.splitCommand = splitCommand;
   sessionRunnerDeps.buildPrompt = buildPrompt;
+  sessionRunnerDeps.extractJobUrlInsights = extractJobUrlInsights;
   sessionRunnerDeps.extractResumeInsights = extractResumeInsights;
   sessionRunnerDeps.getSettings = getSettings;
   sessionRunnerDeps.cacheSessionState = cacheSessionState;
   sessionRunnerDeps.getCachedSessionState = getCachedSessionState;
+  sessionRunnerDeps.createCampaignSnapshot = createCampaignSnapshot;
+  sessionRunnerDeps.recordRunLog = recordRunLog;
+  sessionRunnerDeps.updateCampaignStatus = updateCampaignStatus;
 }
 
 function extractJsonResponse(logs) {
   return __testablesExtractJsonResponse(logs);
 }
 
-async function persistRuntimeState() {
+async function persistRuntimeState({ logToDatabase = false, updateCampaign = false } = {}) {
   const runtime = getRuntimeState();
   if (!runtime.state.sessionKey) {
     return;
   }
 
   await sessionRunnerDeps.cacheSessionState(runtime.state.sessionKey, runtime.state);
+  if (updateCampaign) {
+    await sessionRunnerDeps.updateCampaignStatus({
+      campaignId: runtime.state.campaignId,
+      status: toCampaignStatus(runtime.state.status),
+      finishedAt: runtime.state.finishedAt ? new Date(runtime.state.finishedAt) : null
+    });
+  }
+  if (logToDatabase) {
+    await sessionRunnerDeps.recordRunLog({
+      campaignId: runtime.state.campaignId,
+      sessionKey: runtime.state.sessionKey,
+      status: runtime.state.status,
+      payload: summarizeRuntimeState(runtime.state)
+    });
+  }
+}
+
+function summarizeRuntimeState(state) {
+  return {
+    status: state.status,
+    pid: state.pid,
+    startedAt: state.startedAt,
+    finishedAt: state.finishedAt,
+    exitCode: state.exitCode,
+    signal: state.signal,
+    error: state.error,
+    response: state.response,
+    resumeSignals: state.resumeSignals,
+    promptPreview: state.promptPreview
+  };
+}
+
+function toCampaignStatus(status) {
+  if (status === "completed") {
+    return "COMPLETED";
+  }
+  if (status === "failed") {
+    return "FAILED";
+  }
+  if (status === "stopped") {
+    return "STOPPED";
+  }
+  return "RUNNING";
 }

@@ -38,6 +38,7 @@ test("session runner starts, captures output, and stops a process", async () => 
     getSettings: async () => ({
       resumePath: "",
       jobsFile: "",
+      jobOpeningUrl: "",
       workspace: "/tmp",
       openClawCmd: "openclaw",
       session: "scoutclaw-web",
@@ -77,6 +78,7 @@ test("session runner marks failures on child error", async () => {
     getSettings: async () => ({
       resumePath: "",
       jobsFile: "",
+      jobOpeningUrl: "",
       workspace: "/tmp",
       openClawCmd: "openclaw",
       session: "scoutclaw-web",

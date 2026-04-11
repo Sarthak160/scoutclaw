@@ -2,6 +2,7 @@ import { graphql, buildSchema } from "graphql";
 import { getSessionStateCached, startSessionRun, stopSessionRun } from "../../../src/services/session-runner.js";
 import { getSettings, saveSettings } from "../../../src/services/settings-store.js";
 import { extractResumeInsights } from "../../../src/services/resume.js";
+import { extractJobUrlInsights } from "../../../src/services/job-url-insights.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,8 +22,10 @@ const schema = buildSchema(`
   }
 
   type Settings {
+    mode: String!
     resumePath: String!
     jobsFile: String!
+    jobOpeningUrl: String!
     workspace: String!
     openClawCmd: String!
     session: String!
@@ -46,8 +49,10 @@ const schema = buildSchema(`
   }
 
   input SettingsInput {
+    mode: String
     resumePath: String
     jobsFile: String
+    jobOpeningUrl: String
     workspace: String
     openClawCmd: String
     session: String
@@ -73,6 +78,8 @@ const schema = buildSchema(`
     promptPreview: String!
     response: String!
     resumeSignals: [String!]!
+    sessionKey: String
+    campaignId: String
   }
 
   type DashboardState {
@@ -100,7 +107,8 @@ const defaultDeps = {
   stopSessionRun,
   getSettings,
   saveSettings,
-  extractResumeInsights
+  extractResumeInsights,
+  extractJobUrlInsights
 };
 
 const rootValue = createRootValue(defaultDeps);
@@ -165,12 +173,20 @@ export function createRootValue(deps) {
 
 async function getDashboardState(deps) {
   const settings = await deps.getSettings();
-  const resumeInsights = await deps.extractResumeInsights(settings.resumePath);
+  const resumeInsights = await getContextInsights(settings, deps);
   return {
     settings,
     run: await deps.getSessionState(settings.session),
     resumeInsights
   };
+}
+
+async function getContextInsights(settings, deps) {
+  if (settings.mode === "hire" && settings.jobOpeningUrl) {
+    return deps.extractJobUrlInsights(settings.jobOpeningUrl);
+  }
+
+  return deps.extractResumeInsights(settings.resumePath);
 }
 
 export function pickDefined(value) {
