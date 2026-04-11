@@ -1,7 +1,15 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { getPrismaClient } from "./prisma.js";
+
+const APP_STATE_ID = "default";
 
 export async function getSettings() {
+  const prisma = getPrismaClient();
+  if (prisma) {
+    return getSettingsFromDatabase(prisma);
+  }
+
   await ensureOutputLayout();
   const { settingsPath } = getStorePaths();
 
@@ -16,6 +24,11 @@ export async function getSettings() {
 }
 
 export async function saveSettings(nextSettings) {
+  const prisma = getPrismaClient();
+  if (prisma) {
+    return saveSettingsToDatabase(prisma, nextSettings);
+  }
+
   await ensureOutputLayout();
   const { settingsPath } = getStorePaths();
   const merged = mergeSettings(nextSettings);
@@ -87,4 +100,36 @@ function getStorePaths() {
     settingsPath: path.join(outputRoot, "scoutclaw-settings.json"),
     uploadDir: path.join(outputRoot, "uploads")
   };
+}
+
+async function getSettingsFromDatabase(prisma) {
+  const existing = await prisma.appState.findUnique({
+    where: { id: APP_STATE_ID }
+  });
+
+  if (!existing) {
+    const defaults = defaultSettings();
+    await saveSettingsToDatabase(prisma, defaults);
+    return defaults;
+  }
+
+  return mergeSettings(existing.settings);
+}
+
+async function saveSettingsToDatabase(prisma, nextSettings) {
+  await ensureOutputLayout();
+  const merged = mergeSettings(nextSettings);
+
+  await prisma.appState.upsert({
+    where: { id: APP_STATE_ID },
+    create: {
+      id: APP_STATE_ID,
+      settings: merged
+    },
+    update: {
+      settings: merged
+    }
+  });
+
+  return merged;
 }

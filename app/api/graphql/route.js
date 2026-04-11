@@ -1,5 +1,5 @@
 import { graphql, buildSchema } from "graphql";
-import { getSessionState, startSessionRun, stopSessionRun } from "../../../src/services/session-runner.js";
+import { getSessionStateCached, startSessionRun, stopSessionRun } from "../../../src/services/session-runner.js";
 import { getSettings, saveSettings } from "../../../src/services/settings-store.js";
 import { extractResumeInsights } from "../../../src/services/resume.js";
 
@@ -95,7 +95,7 @@ const schema = buildSchema(`
 `);
 
 const defaultDeps = {
-  getSessionState,
+  getSessionState: getSessionStateCached,
   startSessionRun,
   stopSessionRun,
   getSettings,
@@ -168,7 +168,7 @@ async function getDashboardState(deps) {
   const resumeInsights = await deps.extractResumeInsights(settings.resumePath);
   return {
     settings,
-    run: deps.getSessionState(),
+    run: await deps.getSessionState(settings.session),
     resumeInsights
   };
 }

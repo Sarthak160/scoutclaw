@@ -9,19 +9,14 @@ ScoutClaw is a Next.js control room for resume-driven OpenClaw outreach runs. It
 - Background OpenClaw runner using `openclaw agent`
 - SMTP and applicant profile management from the UI
 - Prompt generation shared between the web app and the CLI wrapper
-
-- `ScoutClaw` does not implement its own agent loop.
-- It launches `openclaw` as a subprocess.
-- It passes your resume path, applicant details, optional jobs file, and SMTP context into the initial prompt.
-- If OpenClaw is not configured yet, it runs `openclaw onboard`.
-- If the Gateway is stopped, it starts `openclaw gateway`.
-- It then opens `openclaw tui` with your outreach prompt as the initial message.
-- After that, OpenClaw owns the session and keeps working until you stop it.
+- PostgreSQL persistence via Prisma
+- Redis-backed session caching for agent runs
 
 ## Setup
 
 ```bash
 npm install
+npm run prisma:generate
 npm run dev
 ```
 
@@ -43,6 +38,10 @@ SMTP_HOST=
 SMTP_PORT=587
 SMTP_USER=
 SMTP_PASS=
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/scoutclaw?schema=public
+REDIS_URL=redis://127.0.0.1:6379
+OPENAI_API_KEY=
+STRIPE_SECRET_KEY=
 ```
 
 ## GraphQL
@@ -60,9 +59,41 @@ Core operations:
 
 Resume upload is handled by `POST /api/upload`.
 
+## Docker Compose
+
+ScoutClaw includes a single `docker-compose.yml` that runs:
+
+- ScoutClaw frontend + backend
+- OpenClaw gateway inside the app container
+- PostgreSQL
+- Redis
+
+To start everything:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Then open `http://localhost:3002`.
+
+If you want a different host port, set it in `.env`:
+
+```bash
+SCOUTCLAW_WEB_PORT=3002
+OPENCLAW_GATEWAY_HOST_PORT=18790
+```
+
+Important notes:
+
+- Set `OPENAI_API_KEY` in `.env` for model access inside Docker.
+- Set `STRIPE_SECRET_KEY` if you want checkout to work.
+- Prisma schema is pushed automatically on container start when `DATABASE_URL` is present.
+- OpenClaw state persists in the Docker `openclaw-data` volume.
+
 ## Notes
 
-- This project is now a client wrapper, not a custom outreach bot.
-- The official CLI command is `openclaw`. If your shell still says not found, open a new terminal or run `source ~/.zprofile`.
-- The wrapper keeps the session open until you terminate it with `Ctrl+C` or close the terminal.
-- In this environment, OpenClaw is installed but not yet onboarded, so the first `scoutclaw run` will likely start the interactive onboarding flow.
+- The web UI still uses `openclaw` as a subprocess for agent runs.
+- If `DATABASE_URL` is absent, ScoutClaw falls back to local JSON settings storage.
+- If `REDIS_URL` is absent, session state stays in memory instead of Redis.
+- The original CLI wrapper still exists and can be launched with `npm run cli`.

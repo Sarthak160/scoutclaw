@@ -4,6 +4,7 @@ import { ensureOpenClawReady, splitCommand } from "../openclaw.js";
 import { buildPrompt } from "../prompt.js";
 import { extractResumeInsights } from "./resume.js";
 import { getSettings } from "./settings-store.js";
+import { cacheSessionState, getCachedSessionState } from "./redis.js";
 
 const MAX_LOG_CHARS = 16000;
 const sessionRunnerDeps = {
@@ -12,7 +13,9 @@ const sessionRunnerDeps = {
   splitCommand,
   buildPrompt,
   extractResumeInsights,
-  getSettings
+  getSettings,
+  cacheSessionState,
+  getCachedSessionState
 };
 
 function getRuntimeState() {
@@ -30,7 +33,8 @@ function getRuntimeState() {
         logs: "",
         promptPreview: "",
         response: "",
-        resumeSignals: []
+        resumeSignals: [],
+        sessionKey: null
       }
     };
   }
@@ -72,8 +76,10 @@ export async function startSessionRun() {
     logs: "",
     promptPreview: prompt.slice(0, 4000),
     response: "",
-    resumeSignals: resumeInsights.searchSignals
+    resumeSignals: resumeInsights.searchSignals,
+    sessionKey: settings.session
   };
+  await persistRuntimeState();
 
   await sessionRunnerDeps.ensureOpenClawReady({
     command: parsedCommand.command,
@@ -104,16 +110,19 @@ export async function startSessionRun() {
 
   runtime.process = child;
   runtime.state.pid = child.pid ?? null;
+  await persistRuntimeState();
 
   child.stdout.on("data", (chunk) => {
     const next = `${runtime.state.logs}${chunk.toString()}`;
     runtime.state.logs = next.slice(-MAX_LOG_CHARS);
     runtime.state.response = extractJsonResponse(runtime.state.logs) || runtime.state.response;
+    void persistRuntimeState();
   });
 
   child.stderr.on("data", (chunk) => {
     const next = `${runtime.state.logs}\n${chunk.toString()}`;
     runtime.state.logs = next.slice(-MAX_LOG_CHARS);
+    void persistRuntimeState();
   });
 
   child.on("error", (error) => {
@@ -121,6 +130,7 @@ export async function startSessionRun() {
     runtime.state.error = error.message;
     runtime.state.finishedAt = new Date().toISOString();
     runtime.process = null;
+    void persistRuntimeState();
   });
 
   child.on("exit", (code, signal) => {
@@ -129,6 +139,7 @@ export async function startSessionRun() {
     runtime.state.finishedAt = new Date().toISOString();
     runtime.state.status = runtime.state.status === "stopped" ? "stopped" : code === 0 ? "completed" : "failed";
     runtime.process = null;
+    void persistRuntimeState();
   });
 
   return getSessionState();
@@ -143,6 +154,7 @@ export function stopSessionRun() {
   runtime.state.status = "stopped";
   runtime.state.finishedAt = new Date().toISOString();
   runtime.process.kill("SIGTERM");
+  void persistRuntimeState();
   return getSessionState();
 }
 
@@ -151,6 +163,16 @@ export function getSessionState() {
   return {
     ...runtime.state
   };
+}
+
+export async function getSessionStateCached(sessionKey) {
+  const runtime = getRuntimeState();
+  if (runtime.state.sessionKey === sessionKey || runtime.process) {
+    return getSessionState();
+  }
+
+  const cached = await sessionRunnerDeps.getCachedSessionState(sessionKey);
+  return cached || getSessionState();
 }
 
 export function __resetSessionRunnerState() {
@@ -192,8 +214,19 @@ function resetSessionRunnerDeps() {
   sessionRunnerDeps.buildPrompt = buildPrompt;
   sessionRunnerDeps.extractResumeInsights = extractResumeInsights;
   sessionRunnerDeps.getSettings = getSettings;
+  sessionRunnerDeps.cacheSessionState = cacheSessionState;
+  sessionRunnerDeps.getCachedSessionState = getCachedSessionState;
 }
 
 function extractJsonResponse(logs) {
   return __testablesExtractJsonResponse(logs);
+}
+
+async function persistRuntimeState() {
+  const runtime = getRuntimeState();
+  if (!runtime.state.sessionKey) {
+    return;
+  }
+
+  await sessionRunnerDeps.cacheSessionState(runtime.state.sessionKey, runtime.state);
 }

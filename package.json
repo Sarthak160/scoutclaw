@@ -12,20 +12,22 @@
     "start": "next start",
     "cli": "node ./src/cli.js",
     "lint": "find app src test -name '*.js' -print0 | xargs -0 -n1 node --check",
-    "test": "node --test"
+    "test": "node --test",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
-    "@prisma/client": "^7.7.0",
+    "@prisma/client": "^6.16.2",
     "commander": "^14.0.1",
     "dotenv": "^17.2.3",
     "graphql": "^16.13.2",
     "ioredis": "^5.10.1",
     "next": "^15.5.15",
     "pdf-parse": "^2.4.5",
-    "prisma": "^7.7.0",
+    "prisma": "^6.16.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "stripe": "^22.0.1"
