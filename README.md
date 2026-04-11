@@ -96,6 +96,38 @@ Important notes:
 - Prisma schema is pushed automatically on container start when `DATABASE_URL` is present.
 - OpenClaw state persists in the Docker `openclaw-data` volume.
 
+## Docker Compose
+
+ScoutClaw includes a single `docker-compose.yml` that runs:
+
+- ScoutClaw frontend + backend
+- OpenClaw gateway inside the app container
+- PostgreSQL
+- Redis
+
+To start everything:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Then open `http://localhost:3002`.
+
+If you want a different host port, set it in `.env`:
+
+```bash
+SCOUTCLAW_WEB_PORT=3002
+OPENCLAW_GATEWAY_HOST_PORT=18790
+```
+
+Important notes:
+
+- Set `OPENAI_API_KEY` in `.env` for model access inside Docker.
+- Set `STRIPE_SECRET_KEY` if you want checkout to work.
+- Prisma schema is pushed automatically on container start when `DATABASE_URL` is present.
+- OpenClaw state persists in the Docker `openclaw-data` volume.
+
 ## Notes
 
 - The web UI still uses `openclaw` as a subprocess for agent runs.
