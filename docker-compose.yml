@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: scoutclaw
+      POSTGRES_USER: scoutclaw
+      POSTGRES_PASSWORD: scoutclaw
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scoutclaw -d scoutclaw"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  scoutclaw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      APP_URL: http://localhost:${SCOUTCLAW_WEB_PORT:-3002}
+      DATABASE_URL: postgresql://scoutclaw:scoutclaw@postgres:5432/scoutclaw?schema=public
+      REDIS_URL: redis://redis:6379
+      OPENCLAW_HOME: /home/node/.openclaw
+      OPENCLAW_GATEWAY_PORT: 18789
+      OPEN_CLAW_CMD: openclaw
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      APPLICANT_NAME: ${APPLICANT_NAME:-}
+      APPLICANT_EMAIL: ${APPLICANT_EMAIL:-}
+      APPLICANT_PHONE: ${APPLICANT_PHONE:-}
+      APPLICANT_LINKEDIN: ${APPLICANT_LINKEDIN:-}
+      APPLICANT_PORTFOLIO: ${APPLICANT_PORTFOLIO:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+    ports:
+      - "${SCOUTCLAW_WEB_PORT:-3002}:3000"
+      - "${OPENCLAW_GATEWAY_HOST_PORT:-18790}:18789"
+    volumes:
+      - openclaw-data:/home/node/.openclaw
+      - scoutclaw-output:/scoutclaw/output
+
+volumes:
+  postgres-data:
+  redis-data:
+  openclaw-data:
+  scoutclaw-output:

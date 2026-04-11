@@ -7,6 +7,7 @@ import {
   __setSessionRunnerDeps,
   __testablesExtractJsonResponse,
   getSessionState,
+  getSessionStateCached,
   startSessionRun,
   stopSessionRun
 } from "../src/services/session-runner.js";
@@ -95,4 +96,16 @@ test("session runner marks failures on child error", async () => {
   child.emit("error", new Error("boom"));
   assert.equal(getSessionState().status, "failed");
   assert.equal(getSessionState().error, "boom");
+});
+
+test("session runner can read a cached session snapshot", async () => {
+  __resetSessionRunnerState();
+  __setSessionRunnerDeps({
+    getCachedSessionState: async (sessionKey) =>
+      sessionKey === "cached-session" ? { status: "completed", sessionKey, response: "cached" } : null
+  });
+
+  const state = await getSessionStateCached("cached-session");
+  assert.equal(state.status, "completed");
+  assert.equal(state.response, "cached");
 });
