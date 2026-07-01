@@ -2,8 +2,11 @@
 
 ScoutClaw is a two-sided Next.js control room for OpenClaw-powered outreach campaigns. It supports `Get hired` workflows for job/recruiter outreach and `Want to hire` workflows for candidate/student outreach from a role brief or job opening URL.
 
+The project is written entirely in **TypeScript** — the Next.js app (App Router pages, UI components, and route handlers), the shared services layer, and the CLI wrapper all share strongly-typed models.
+
 ## What It Includes
 
+- Fully typed TypeScript codebase across the web app, services, and CLI
 - Resume or role-brief upload with local PDF parsing for search signals
 - Two campaign modes: applicant outreach and hiring outreach
 - GraphQL API for dashboard state, settings, filters, and run controls
@@ -23,6 +26,24 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+## Scripts
+
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Start the Next.js dev server |
+| `npm run build` | Type-check and build the Next.js production bundle |
+| `npm run start` | Serve the production build |
+| `npm run typecheck` / `npm run lint` | Run `tsc --noEmit` over the whole project |
+| `npm test` | Run the `node:test` suite through `tsx` |
+| `npm run cli` | Run the CLI wrapper from source via `tsx` |
+| `npm run build:cli` | Compile the CLI + services to `dist/` (NodeNext ESM) |
+| `npm run prisma:generate` | Generate the Prisma client |
+| `npm run prisma:push` | Push the Prisma schema to the database |
+
+The published `scoutclaw` binary points at `dist/cli.js`, so run `npm run build:cli` before invoking it as an installed executable. During development use `npm run cli` (which runs `src/cli.ts` directly through `tsx`).
+
+Relative imports keep the `.js` extension even though the sources are `.ts`/`.tsx`; this is the standard TypeScript-ESM convention and is required so the CLI can be compiled with NodeNext module resolution. `next.config.ts` teaches webpack to resolve those `.js` requests to the corresponding TypeScript files.
 
 ## Environment
 
@@ -133,4 +154,4 @@ Important notes:
 - The web UI still uses `openclaw` as a subprocess for agent runs.
 - If `DATABASE_URL` is absent or temporarily unreachable, ScoutClaw falls back to local JSON settings storage.
 - If `REDIS_URL` is absent or temporarily unreachable, session state stays in memory instead of Redis.
-- The original CLI wrapper still exists and can be launched with `npm run cli`.
+- The original CLI wrapper still exists and can be launched with `npm run cli` (or compiled with `npm run build:cli`).
