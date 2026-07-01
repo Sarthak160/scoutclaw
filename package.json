@@ -4,15 +4,17 @@
   "description": "Two-sided OpenClaw dashboard for hiring and job-search outreach campaigns with filters, payments, Postgres, and Redis.",
   "type": "module",
   "bin": {
-    "scoutclaw": "./src/cli.js"
+    "scoutclaw": "./dist/cli.js"
   },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "cli": "node ./src/cli.js",
-    "lint": "find src test -name '*.js' -print0 | xargs -0 -n1 node --check",
-    "test": "node --test",
+    "cli": "tsx src/cli.ts",
+    "build:cli": "tsc -p tsconfig.build.json",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"test/*.test.ts\"",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push"
   },
@@ -31,5 +33,12 @@
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "stripe": "^22.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
   }
 }
